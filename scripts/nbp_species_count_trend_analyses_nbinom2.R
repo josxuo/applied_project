@@ -319,8 +319,6 @@ for(i in 1:length(parks)) {
   #dev.off()
 }
 
-# visualize the larger-scale species trends
-
 
 
 
