@@ -47,39 +47,34 @@ d <- nbp %>%
 
 
 ## test model on a few species
-focal.species <- "HOSP"  ## House Sparrow
+focal.species <- "ANHU"  ## Anna's Hummingbird
 
 focal.d <- d %>% filter(bird.code == focal.species)
-
-focal.d$obs_id <- 1:nrow(focal.d)  # added in case I wanted to try adding observation-level random effects
-
 
 mod <- glmmTMB(nobs ~ syear + month + (1 | pls), data = focal.d, family = "nbinom2")  ## pls = park-loop-station, i.e., site
 
 sum(residuals(mod, type = "pearson")^2) / df.residual(mod)  # Pearson dispersion statistic
 summary(mod)
 
-plot(simulateResiduals(mod))
 testZeroInflation(mod)
 
 
-## RESULT: significant positive trend. Overdispersed, but not wild. 
+## RESULT: significant positive trend. Dispersion stat looks good. ZI not an issue. 
 
 
 focal.species <- "AMCR"  # American crow
 
 focal.d <- d %>% filter(bird.code == focal.species)
 
-focal.d$obs_id <- 1:nrow(focal.d)
-
 mod <- glmmTMB(nobs ~ syear + month + (1 | pls), data = focal.d, family = "nbinom2")
 
-plot(simulateResiduals(mod))
+sum(residuals(mod, type = "pearson")^2) / df.residual(mod)
+
 testZeroInflation(mod)
 
 summary(mod)
 
-## RESULT: Dispersion OK. Zero inflation not an issue. AMCR scaled year term is negative and significant.
+## RESULT:Overdispersed, but not wildly so. ZI not an issue. AMCR scaled year term is positive and significant.
 
 
 ## Analysis objective: Estimate trend for all species with detections in at least 10 years
