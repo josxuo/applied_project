@@ -26,38 +26,18 @@ Year as a continuous fixed effect to estimate long-term temporal trends. This te
 
 Month as a categorical fixed effect to control for seasonal variability in bird activity and detectability. 
 
-Site as a random intercept to account for unmeasured variation in habitat and other site-level factors that influence bird counts. 
+Site as a random intercept to account for unmeasured variation in habitat and other site-level factors that influence bird counts.
 
-Given that count data were overdispersed relative to the Poisson distribution, we used the Negative Binomial 2 (NB2) distribution for the response variable. In the NB2 parameterization, the variance increases quadratically with the mean, making it better suited to handle the observed variability in the data. 
+An observation-level random effect to account for additional unmeasured variation that could be related to day, observers, bird species, or other factors that influence bird counts. 
+
+Prior to adding an observation-level random effect, the count data were overdispersed relative to the Poisson distribution, and we used the Negative Binomial 2 (NB2) distribution for the response variable. In the NB2 parameterization, the variance increases quadratically with the mean, making it better suited to handle the observed variability in the data. 
+
+Adding the observation-level random effect helped address overdispersion. Dispersion statistics for models assuming a Poisson distribution with both observation-level and site-level random effects were reasonable. 
 
 ## Implementation 
 
 Models were fit using the glmmTMB package in R. Separate models were fit for each species to estimate species-specific trends. To estimate overall trends, data from all active parks were included in a single model. For park-level analyses, models were subset by park. Only species with observations in at least ten years were included.  
 
-Trend classification 
+## Presenting Results
 
-To classify species trends, we used the model coefficient associated with the z-standardized year variable. We adjusted this coefficient based on the original spread of the data and exponentiated it to express annual changes in abundance (“bkt_beta_yr”). Because bkt_beta_yr represents the annual change factor (with 1.00 meaning no change), we interpreted values ≥1.05 an Increasing trend and values ≤0.95 as a Decreasing trend; values between 0.95 and 1.05 were deemed Stable.  
-
-Increasing: bkt_beta_yr ≥ 1.05 
-
-Decreasing: bkt_beta_yr ≤ 0.95 
-
-Stable: 0.95 < bkt_beta_yr < 1.05 
-
-## Confidence classification 
-
-We assessed confidence in each modeled trend using three diagnostic measures: the p-value of the year effect (p_yr), the model pseudo-R² (r2), and the dispersion parameter (disp). Based on these, we assigned High, Moderate, or Low confidence as follows: 
-
-High confidence: p_yr ≤ 0.01, r2 ≥ 0.3, and disp ≤ 1.5 
-
-Moderate confidence: p_yr ≤ 0.1, r2 ≥ 0.1, and disp ≤ 2 
-
-Low confidence: all other cases 
-
-High-confidence trends require a very significant year effect, a relatively strong model fit, and near-ideal dispersion.  
-
-Moderate confidence allows a more lenient significance cutoff and modest model fit and tolerates slightly more overdispersion.  
-
-Trends failing to meet the high or moderate criteria were marked as low confidence.  
-
-To simplify presentation of results, high and moderate confidence estimates were lumped into a single category “Confident”. Low confidence estimates were renamed “Not confident”.  
+Mean trend estimates and 95% confidence intervals were reported for 112 species. All trends are reported, regardless of statistical signficance. Estimates with wide confidence intervals, especially those that include zero, should be interpreted cautiously, if at all.
