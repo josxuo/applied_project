@@ -136,9 +136,9 @@ res <- data.frame(species, beta_yr, se_yr, p_yr, r2, disp)  ## combine into sing
 res_status <- res %>%
   mutate(bkt_beta_yr = exp(beta_yr / sd_year),
          trend = factor(case_when(
-           bkt_beta_yr >= 1.05 ~ "Increasing",
-           bkt_beta_yr <= 0.95 ~ "Decreasing",
-           TRUE ~ "Stable"  # catch-all for 0.95–1.05
+           bkt_beta_yr >= 1.01018 ~ "Increasing",
+           bkt_beta_yr <= 0.9876797 ~ "Decreasing",
+           TRUE ~ "Stable"  # catch-all
          ), levels = c("Stable", "Decreasing", "Increasing")),
          confidence = factor(case_when(
            p_yr <= 0.01 & r2 >= 0.3 & disp >= 0.7 & disp <= 1.5 ~ "high confidence",
@@ -146,17 +146,21 @@ res_status <- res %>%
            TRUE ~ "low confidence"),  # catch-all
            levels = c("low confidence", "moderate confidence", "high confidence")),
          trend_confidence = paste0(trend, " (", confidence, ")"),
-         sht_confidence = ifelse(confidence == "high confidence" | confidence == "moderate confidence", "Moderate to high confidence", "Low confidence"))
+         sht_confidence = ifelse(confidence == "high confidence" | confidence == "moderate confidence", "confident", "not confident"),
+         sht_trend_confidence = factor(paste0(trend, " (", sht_confidence, ")"), levels = c("Increasing (confident)", "Increasing (not confident)",
+                                                                                            "Stable (confident)", "Stable (not confident)", 
+                                                                                            "Decreasing (confident)", "Decreasing (not confident)")))
+                                                                                        
 
     
   
-#view(res_status)
+view(res_status)
+
+res_status %>% group_by(sht_trend_confidence) %>% summarise(n = n(), .group = "drop") %>% ggplot() + geom_col(aes(x = "", y = n, fill = sht_trend_confidence)) 
 
 #write.csv(res_status, "results/tables/aggregtaed_results.csv")
 
-#res_status <- read_xlsx("results/tables/aggregtaed_results.xlsx") %>% mutate(
-#  sht_confidence = ifelse(confidence == "high confidence" | confidence == "moderate confidence", "Moderate to high confidence", "Low confidence"))
-
+res <- read_xlsx("results/tables/aggregated_results.xlsx") %>% select(species:disp)
 # visualize results
 
 p.dat <- res_status %>% mutate(
@@ -320,6 +324,136 @@ for(i in 1:length(parks)) {
 }
 
 
+##### Try with observation-level random effect. Note that this helped with 
+##### dispersion issues; poisson distribution appears suitable with this model
+
+d <- nbp %>%
+  # create some new fields to help with data preparation / analysis
+  mutate(pls = paste(park, loop, station, sep = "-"),
+         dpl = paste(survey_date, park, loop, sep = "-"),
+         day = day(survey_date)) %>%
+  # subset data to include only non-overlapping count stations
+  filter(station.code %in% covs$station.code,
+         # filter out spuh records       
+         !str_detect(species, pattern = "sp\\."),
+         # filter out duplicated mag park survey
+         dpl != "2021-09-13-Magnuson Park-Waterfront Loop",
+         # filter out years with limited / spotty data collection
+         year %in% c(2005:2019, 2022, 2023)) %>%
+  group_by(survey_date, park, pls, survey_id, bird.code) %>% 
+  summarise(nobs = sum(observed), .groups = "drop") %>%
+  pivot_wider(names_from = bird.code, values_from = nobs, values_fill = 0) %>%
+  pivot_longer(-c(1:4), names_to = "bird.code", values_to = "nobs") %>%
+  mutate(year = year(survey_date),
+         syear = as.numeric(scale(year)),
+         month = as.factor(month(survey_date)),
+         day = day(survey_date),
+         y_day = as.factor(yday(survey_date)), 
+         obs_id = as.factor(row_number()))
+
+# Pull codes for species with detections in at least 10 years 
+spp <- d %>% 
+  group_by(year, bird.code) %>% 
+  summarise(dets = sum(nobs > 0), .groups = "drop") %>%
+  group_by(bird.code) %>% 
+  summarise(years_w_dets = sum(dets > 0), .groups = "drop") %>% 
+  filter(years_w_dets >= 10) %>% 
+  arrange(bird.code) %>% 
+  pull(bird.code)
+dir.create("results/figures")
+
+# Objects to store model coefficients and diagnostic info
+r2 <- numeric(length(spp))
+disp <- numeric(length(spp))
+beta_yr <- numeric(length(spp))
+se_yr <- numeric(length(spp))
+p_yr <- numeric(length(spp))
+species <- character(length(spp))
 
 
+sd_year <- sd(d$year)  # standard deviation for year for later coefficient adjustment
 
+
+# loop for modeling observations for each species
+
+for(i in 1:length(spp)) {
+  
+  mod.dat <- d %>% filter(bird.code == spp[i])
+  mod <- glmmTMB(nobs ~ syear + month + (1 | obs_id) + (1 | pls), data = mod.dat, family = poisson(link = "log"))
+  
+  # Extract model coefficients
+  beta_yr[i] <- summary(mod)$coefficients$cond["syear", "Estimate"]
+  se_yr[i] <- summary(mod)$coefficients$cond["syear", "Std. Error"]
+  p_yr[i] <- summary(mod)$coefficients$cond["syear", "Pr(>|z|)"]
+  
+  # Store identifiers
+  species[i] <- spp[i]
+  
+  print(paste(spp[i], "complete"))
+}
+
+res <- data.frame(species, beta_yr, se_yr, p_yr)  ## combine into single dataframe
+write.csv(res, "poisson_aggregated_results.csv")
+view(res)
+
+res$bkt_beta_yr <- exp(res$beta_yr / sd_year)
+res$bkt_upper <- exp((res$beta_yr + res$se_yr) / sd_year)
+res$bkt_lower <- exp((res$beta_yr - res$se_yr) / sd_year)
+
+p.dat <- res[complete.cases(res), ] %>%
+  mutate(pspecies = fct_reorder(species, bkt_beta_yr))
+
+chart <- ggplot(p.dat[p.dat$p_yr < 1, ], aes(y = pspecies, x = (bkt_beta_yr - 1))) +
+  geom_vline(xintercept = 0, color = bcs_colors["dark green"], linetype = "dashed") +
+  geom_point(size = 2, color = bcs_colors["dark green"]) +  # Trend point estimates
+  geom_errorbarh(aes(xmin = (bkt_lower - 1),
+                     xmax = (bkt_upper - 1)),
+                 height = 0.3, color = bcs_colors["bright green"]) +  # Horizontal error bars
+  #geom_text(aes(label = label), 
+            #vjust = 0.7, hjust = p.dat$hjust_star, size = 5, na.rm = TRUE) +  # Optional annotations
+  #coord_flip() +
+  labs(y = "",
+       x = "Estimated annual % change") +
+  theme_bcs() +
+  theme(axis.text = element_text(size = 8),
+        axis.title = element_text(size = 12))
+
+
+png(filename = "all_results_poisson.png", height = 11, width = 5, units = "in", res = 300)
+chart
+dev.off()
+
+sum(p.dat$bkt_beta_yr < 0.9876797) & p.dat$p_yr < 0.1)
+sum(p.dat$bkt_beta_yr >= 0.9876797) & p.dat$p_yr < 0.1)
+76/42
+72/(72+40)
+32/16
+32/(16+32)
+
+61/(61+51)
+
+dim(p.dat)
+view(p.dat)
+
+focal <- c("CORA", 'PUFI', 'DEJU', 'EUST', 'HOSP', "BARS")
+plot <- ggplot(p.dat %>% filter(species %in% focal), aes(x = pspecies, y = ((bkt_beta_yr - 1) * 100))) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = bcs_colors["dark green"]) +
+  geom_errorbar(aes(ymin = ((bkt_lower - 1) * 100),
+                     ymax = ((bkt_upper - 1) * 100)),
+                 width = 0.2, color = bcs_colors["bright green"]) +  # Horizontal error bars
+  geom_point(size = 2, color = bcs_colors["dark green"]) +  # Trend point estimates
+  #geom_text(aes(label = label), 
+  #vjust = 0.7, hjust = p.dat$hjust_star, size = 5, na.rm = TRUE) +  # Optional annotations
+  #coord_flip() +
+  labs(y = "Annual % change", x = "") +
+  #annotate("text", y = 0, x = 0.5, label = "no change", hjust = 0, vjust = -0.2, color = bcs_colors["dark green"]) +
+  theme_bcs() +
+  theme(panel.grid.major.x = element_blank(), 
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12))
+
+
+png(filename = 'ecnw_graphic.png', width = 5, height = 2, units = 'in', res = 300)
+plot
+dev.off()
+?png

@@ -1,0 +1,45 @@
+Meeting with David Fletcher
+
+-Provide overview of goals
+1) Assess species trends at regional scale and at park-level
+2) Assess if species composition is changing in aggregate and at park-level
+
+
+Quick and dirty analysis OK
+
+Questions:
+How does this approach to quick and dirty trend assessment feel? 
+
+Breeding bird survey, statisticians at USGS where there was potential for observers to learn: could check out the discussion of caveats
+
+He gave advice to Erin: double observer technique: Reasonably straightforward way that is not as intensive to allow you to get some handle on what could happen for these species, the detection probability is high, could help you get a handle on detection probability. 
+
+Assumptions inherent.
+
+Trends at each park: should I use random effect for park??
+
+David not sure in terms of confidence measures, not sure he would use dispersion parameter? could add an observation-level random effect, like adding an error term. Even if you can't add an error term
+
+
+Pearson stat can be quite poor at estimating dispersion for with observations with low counts. If you've got only fixed effects terms, these residuals are very obvious to calculate. But random effects, there are different types of residuals. 
+
+There might be a more reliable way to calculate residuals. Could be that Pearson stat is not reliable. 
+
+If you were to add an observation-level effect. If the dispersion is 2, then I need to multiply my SE by 2 and have a more reliable estimate. If variability is 2 from what I'd expect from an NB2, then my standard errors should be multiplied by square root of 2, can help adjust confidence intervals. If the Pearson thing is reliable, then should make that adjustment. Wouldn't 
+
+David is against R2. There are ways you can show R2 is misleading. David would give the confidence interval for the trend and say, don't even say high confidence / low confidence. Detection probability not being constant provides the real definer of confidence. Don't use any of those three measures for confidence. Just present estimate and confidence interval for trend. Particularly for the bigger picture, the detection probability. 
+
+How does Pearson work with NB2 model? The estimate of dispersion can be really highly variable.
+
+David suggested a way to estimate dispersion, but is it useful for an NB2 model.
+
+Multivariate temporal model where looking, species composition over time. 
+
+If estimate for standard deviation of variance component is not zero. What difference does it make to se for betas? 
+
+Deliverables for the applied project: a few pages of a report, little bit subjective as what qualifies as a good project. Won't 
+
+
+
+
+
